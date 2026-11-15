@@ -1,0 +1,17 @@
+diff --git a/upt.py b/upt.py
+index ea790ea..c0c2cd6 100644
+--- a/upt.py
++++ b/upt.py
+@@ -127,7 +127,11 @@ class UPT(nn.Module):
+             alpha=self.alpha, gamma=self.gamma
+         )
+ 
+-        return loss / n_p
++        # The upstream multi-GPU recipe averages positive matches across all
++        # workers. On a single GPU, an image can have no matched HOI pairs;
++        # dividing by zero then produces NaN and prevents training. Keep the
++        # focal loss finite for such a batch (its numerator is zero there).
++        return loss / max(n_p, 1)
+ 
+     def prepare_region_proposals(self, results, hidden_states):
+         region_props = []

@@ -1,0 +1,42 @@
+# Local datasets and annotation payloads (keep the human-readable manifest)
+/data/*
+!/data/manifest.md
+
+# Downloaded pretrained/model checkpoints; obtain from the official sources
+/checkpoints/official/*.pth
+/checkpoints/official/*.pt
+/checkpoints/official/*.ckpt
+/checkpoints/official/*.safetensors
+
+# Training checkpoints are large and are created locally
+/outputs/training/
+
+# Prediction caches and transient download/build files
+/outputs/**/*.pkl
+*.tmp
+*.partial
+*.download
+*.zip
+
+# Upstream source clones are separate Git repositories. Recreate them from
+# the pinned commits/instructions in HANDOFF.md and apply the project patches.
+/repos/
+
+# Python-generated files and local run logs
+**/__pycache__/
+*.py[cod]
+*.log
+
+# Local environment files and editor/OS metadata
+.venv/
+venv/
+.env
+.env.*
+!.env.example
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Personal generated report; the maintained project documentation is Markdown
+/UPT_R50_Reproduction_Report.docx
