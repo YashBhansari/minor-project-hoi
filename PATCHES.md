@@ -23,7 +23,8 @@
 
 - Repository: `work/repos/upt/upt.py`.
 - Change: in `compute_interaction_loss`, divide by `max(n_p, 1)` instead of `n_p` directly. The official distributed recipe aggregates positive matches across workers; a one-image, single-GPU batch can contain no positive matches, which otherwise makes loss `0/0` and aborts training. With no positive matches, this keeps the all-negative batch loss finite.
-- The detector remains frozen and only the interaction head is optimized, as in the upstream design. Training uses one process and batch size 1 because this Windows CUDA build cannot safely use UPT's DDP wrapper.
+- The patch also stores the positive-match count as `self.num_positives`, so the trainer can normalise a 16-image step by the positives of all its images, as the distributed recipe does.
+- The detector remains frozen and only the interaction head is optimized, as in the upstream design. Training uses one process and accumulates gradients over small forward passes because this Windows CUDA build cannot safely use UPT's DDP wrapper.
 - The launcher stores the optimizer, scheduler, sample order, random-number-generator state, and model weights in the same resumable checkpoint. No per-step or run log files are created.
 
 ## Patch files for a fresh clone

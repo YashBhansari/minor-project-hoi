@@ -17,7 +17,7 @@ Original machine: Windows 11, RTX 2050 with 4 GB VRAM, 16 GB RAM. Local software
 | Detector initialization | Official dataset-specific DETR-R50 `.pth` file |
 | Trainable parameters | UPT interaction head; detector frozen |
 | Epochs | 20 |
-| Batch size | 1 |
+| Batch size | 16 per optimizer step, as in the paper; accumulated over forward passes of 2 images |
 | Optimizer | AdamW |
 | Interaction-head learning rate | 1e-4 |
 | Weight decay | 1e-4 |
@@ -27,7 +27,7 @@ Original machine: Windows 11, RTX 2050 with 4 GB VRAM, 16 GB RAM. Local software
 | Checkpoint interval | Every 250 optimizer steps and each epoch boundary |
 | Distributed training | Disabled; one process on Windows |
 
-The RTX 2050 memory limit is the reason for the one-image batch and single-process setup. The launcher is quiet and does not create training logs. Check the checkpoint file's last-modified time and process CPU time to monitor activity. Do not claim a duration in advance; record actual runtime.
+GPU memory is the reason for accumulating small forward passes in a single process. The trainer shows a live progress bar and does not create training logs. Check the checkpoint file's last-modified time and process CPU time to monitor activity. Do not claim a duration in advance; record actual runtime.
 
 ## Evaluation protocol
 
@@ -58,7 +58,7 @@ These are comparison references, not expected or guaranteed local training outco
 ## Reproduction deviations and code changes
 
 1. Training uses single-process Windows CUDA instead of the upstream distributed setup.
-2. Batch size is one due to GPU memory constraints.
+2. The paper's 16-image step is reproduced by gradient accumulation: each forward pass back-propagates its un-normalised loss, and the accumulated gradient is divided by the positive matches of all 16 images, which is the update the 8-GPU recipe computes.
 3. The local UPT interaction loss clamps the positive-match denominator to at least one so a batch with no positive matches does not yield division by zero.
 4. The V-COCO evaluator was patched for current Python and NumPy compatibility and indexes detections by image for evaluation speed.
 5. Evaluation wrappers call the upstream metric/cache methods directly to avoid UPT's Windows-incompatible distributed entry point.

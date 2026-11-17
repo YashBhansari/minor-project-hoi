@@ -35,6 +35,7 @@ torchvision.models.resnet50 = _resnet50_without_initial_weights
 
 from utils import DataFactory, CustomisedDLE, custom_collate  # noqa: E402
 from upt import build_detector  # noqa: E402
+import cross_dataset  # noqa: E402
 
 
 class ModelAdapter(torch.nn.Module):
@@ -66,14 +67,17 @@ def parse_args():
         default=WORK_ROOT / "outputs" / "vcoco",
     )
     parser.add_argument("--num-workers", type=int, default=0)
+    parser.add_argument("--trained-on", choices=("hicodet", "vcoco"), default="vcoco",
+                        help="Dataset the checkpoint was trained on; its classes are "
+                             "relabelled when it differs from the test dataset.")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
-    args.data_root = args.data_root.resolve()
-    args.checkpoint = args.checkpoint.resolve()
-    args.output_dir = args.output_dir.resolve()
+    args.data_root = (WORK_ROOT / args.data_root).resolve()
+    args.checkpoint = (WORK_ROOT / args.checkpoint).resolve()
+    args.output_dir = (WORK_ROOT / args.output_dir).resolve()
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     if not torch.cuda.is_available():
@@ -107,11 +111,16 @@ def main():
         fg_iou_thresh=0.5, min_instances=3, max_instances=15,
         pretrained="", device="cuda",
     )
-    class_corr = list(trainset.dataset.object_to_action.values())
+    source = trainset if args.trained_on == "vcoco" else DataFactory(
+        "hicodet", "train2015", str(args.data_root))
+    names, class_corr = cross_dataset.classes(source.dataset)
+    model_args.num_classes = len(names)
     model = build_detector(model_args, class_corr)
     checkpoint = torch.load(args.checkpoint, map_location="cpu", weights_only=True)
     model.load_state_dict(checkpoint["model_state_dict"], strict=True)
-    model = ModelAdapter(model.cuda()).eval()
+    model = model.cuda()
+    model = (ModelAdapter(model) if source is trainset else
+             cross_dataset.Relabel(model, source.dataset, trainset.dataset).cuda()).eval()
 
     # Reuse the authors' V-COCO prediction formatter and cache implementation.
     engine = SimpleNamespace(_state=SimpleNamespace(net=model))
@@ -126,6 +135,7 @@ def main():
         "partition": "test",
         "num_evaluated_images": len(testset),
         "checkpoint": str(args.checkpoint),
+        "trained_on": args.trained_on,
         "checkpoint_sha256": sha256(args.checkpoint),
         "cache": str(cache_path),
         "cache_sha256": sha256(cache_path),

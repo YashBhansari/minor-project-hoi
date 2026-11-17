@@ -1,0 +1,19 @@
+{
+  "dataset": "V-COCO",
+  "model": "UPT-R50",
+  "evaluator": "Gupta et al. official V-COCO evaluator",
+  "evaluator_commit": "489cc4db74f2f10ab4b134f67da3874afbf245ab",
+  "overlap_threshold": 0.5,
+  "upt_cache": "C:\\Users\\veera\\Documents\\minor-project-hoi\\outputs\\trained-evaluation\\hico-on-vcoco\\cache.pkl",
+  "upt_cache_sha256": "797f8480e50dabcddbc3c9ead936fb4cbfc5dbe644429a2ea5b0bcbce25d73a5",
+  "coco_annotation_subset": "C:\\Users\\veera\\Documents\\minor-project-hoi\\repos\\v-coco\\data\\instances_vcoco_all_2014.json",
+  "scenarios_raw_AP_percent": {
+    "scenario_1": 42.58,
+    "scenario_2": 46.37
+  },
+  "scenarios_upt_corrected_AP_percent": {
+    "scenario_1": 44.354166666666664,
+    "scenario_2": 48.302083333333336
+  },
+  "correction": "multiply by 25/24 per UPT authors' V-COCO evaluation instructions"
+}

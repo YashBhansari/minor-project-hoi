@@ -1,8 +1,8 @@
 diff --git a/upt.py b/upt.py
-index ea790ea..c0c2cd6 100644
+index ea790ea..7bdac4c 100644
 --- a/upt.py
 +++ b/upt.py
-@@ -127,7 +127,11 @@ class UPT(nn.Module):
+@@ -127,7 +127,13 @@ class UPT(nn.Module):
              alpha=self.alpha, gamma=self.gamma
          )
  
@@ -11,6 +11,8 @@ index ea790ea..c0c2cd6 100644
 +        # workers. On a single GPU, an image can have no matched HOI pairs;
 +        # dividing by zero then produces NaN and prevents training. Keep the
 +        # focal loss finite for such a batch (its numerator is zero there).
++        # Read by the single-GPU trainer, which pools this count over a whole step.
++        self.num_positives = n_p
 +        return loss / max(n_p, 1)
  
      def prepare_region_proposals(self, results, hidden_states):

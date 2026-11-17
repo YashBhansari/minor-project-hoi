@@ -1,9 +1,10 @@
 $ErrorActionPreference = 'Stop'
 
 $work = $PSScriptRoot
-$python = $env:UPT_PYTHON
+# Use UPT_PYTHON if set, otherwise whichever python is on PATH (the activated venv)
+$python = if ($env:UPT_PYTHON) { $env:UPT_PYTHON } else { (Get-Command python -ErrorAction SilentlyContinue).Source }
 if ([string]::IsNullOrWhiteSpace($python) -or -not (Test-Path -LiteralPath $python -PathType Leaf)) {
-    throw 'Set UPT_PYTHON to the full path of the compatible Python executable before training.'
+    throw 'Activate the virtual environment or set UPT_PYTHON to the Python executable before training.'
 }
 $trainer = Join-Path $work 'train_upt_windows.py'
 $initialization = Join-Path $work 'checkpoints\official\detr-r50-vcoco.pth'
@@ -23,7 +24,7 @@ try {
     catch [System.Threading.AbandonedMutexException] { $hasMutex = $true }
     if (-not $hasMutex) { throw 'A V-COCO training process is already running.' }
     $arguments = @($trainer, '--dataset', 'vcoco', '--detr-checkpoint', $initialization,
-        '--output-dir', $output, '--epochs', '20', '--batch-size', '1',
+        '--output-dir', $output, '--epochs', '20', '--batch-size', '16', '--micro-batch', '2',
         '--checkpoint-interval', '250')
     if (Test-Path -LiteralPath $latest -PathType Leaf) {
         $arguments += @('--resume', $latest)

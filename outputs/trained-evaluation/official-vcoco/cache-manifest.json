@@ -1,0 +1,22 @@
+{
+  "model": "UPT-R50",
+  "dataset": "V-COCO",
+  "partition": "test",
+  "num_evaluated_images": 4532,
+  "checkpoint": "C:\\Users\\veera\\Documents\\minor-project-hoi\\checkpoints\\official\\upt-r50-vcoco.pt",
+  "trained_on": "vcoco",
+  "checkpoint_sha256": "fe26808d15175d61fb0b85412481825e69207136d739d2f66867ec689cd0c329",
+  "cache": "C:\\Users\\veera\\Documents\\minor-project-hoi\\outputs\\trained-evaluation\\official-vcoco\\cache.pkl",
+  "cache_sha256": "046b58d6fff367848d23a3477075153a5d38056029a54d126deb478701e198e5",
+  "cache_bytes": 76164505,
+  "environment": {
+    "python": "3.14.6",
+    "torch": "2.14.1+cu130",
+    "torchvision": "0.29.1+cu130",
+    "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU"
+  },
+  "compatibility_path": "single-process; official UPT cache_vcoco method",
+  "runtime_seconds": 449.81014549999963,
+  "peak_cuda_allocated_MiB": 543.89892578125,
+  "peak_cuda_reserved_MiB": 1358.0
+}

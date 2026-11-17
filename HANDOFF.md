@@ -36,7 +36,7 @@ The original laptop is Windows 11 with an RTX 2050 (4 GB VRAM) and 16 GB RAM. Th
 
 Set `$env:UPT_PYTHON` to the full path of your compatible `python.exe` before running the training launchers. The original environment was checked with Python 3.14.7, PyTorch 2.14.1+cu130, and torchvision 0.29.1+cu130. The environment freeze is in `environment/windows-py314-freeze.txt`; it records installed packages but is not a one-command portable installer.
 
-The RTX 2050 has limited VRAM. These scripts use one process and batch size 1. Run only one dataset training job at a time. Training could take many hours or days; exact runtime depends on the machine and should be measured rather than promised.
+The RTX 2050 has limited VRAM. These scripts use one process and 16 images per optimizer step (the paper's batch size), accumulated over forward passes of 2 images. Run only one dataset training job at a time. Training could take many hours or days; exact runtime depends on the machine and should be measured rather than promised.
 
 ## 4. Folder map
 
@@ -109,9 +109,9 @@ When the HICO launcher exits successfully and `outputs\training\hicodet\checkpoi
 .\train_vcoco.ps1
 ```
 
-Each launcher requests 20 epochs, batch size 1, and a checkpoint every 250 optimizer steps. It automatically resumes from `checkpoint_latest.pt` if interrupted. A completed run renames the latest checkpoint to `checkpoint_final.pt`. Do not run two jobs for the same dataset at once. Do not delete `checkpoint_latest.pt` during an active or interrupted run.
+Each launcher requests 20 epochs, a batch size of 16 (gradient accumulation over passes of 2 images), and a checkpoint every 250 optimizer steps. It automatically resumes from `checkpoint_latest.pt` if interrupted. A completed run renames the latest checkpoint to `checkpoint_final.pt`. Do not run two jobs for the same dataset at once. Do not delete `checkpoint_latest.pt` during an active or interrupted run.
 
-The trainer is deliberately quiet: it does not write a training log or print per-step progress. To check that it is still running, use a second PowerShell window and inspect the process and checkpoint timestamp:
+The trainer shows a live progress bar (step, epoch, loss, speed, estimated time left) and writes no log file. To check on it from elsewhere, use a second PowerShell window and inspect the process and checkpoint timestamp:
 
 ```powershell
 Get-Process python -ErrorAction SilentlyContinue | Select-Object ProcessName,CPU,StartTime
@@ -164,7 +164,7 @@ Use the corrected Scenario 1 and Scenario 2 AP_role values in `metrics.json`, an
 
 ## 10. Compatibility changes and caveats
 
-This is a Windows, single-GPU adaptation. The upstream UPT entrypoint uses distributed training and NCCL, which is not used by the local wrappers. Training freezes the detector and optimizes the interaction head, with batch size 1. The local UPT loss code clamps the positive-match normalizer to avoid division by zero when a single-image batch contains no positive matches. The official V-COCO evaluator has Python 3 / NumPy compatibility changes. Details and the patch are in [PATCHES.md](PATCHES.md) and `vcoco-evaluator-python3.patch`.
+This is a Windows, single-GPU adaptation. The upstream UPT entrypoint uses distributed training and NCCL, which is not used by the local wrappers. Training freezes the detector and optimizes the interaction head, with 16 images per optimizer step accumulated over forward passes of 2 images. The local UPT loss code clamps the positive-match normalizer to avoid division by zero when a single-image batch contains no positive matches. The official V-COCO evaluator has Python 3 / NumPy compatibility changes. Details and the patch are in [PATCHES.md](PATCHES.md) and `vcoco-evaluator-python3.patch`.
 
 These adaptations should be disclosed in a report. Do not call the experiment an exact reproduction of the authors' multi-GPU training setup.
 

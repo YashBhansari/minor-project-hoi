@@ -25,6 +25,7 @@ import torchvision
 import torch.distributed as dist
 import pocket
 from torch.utils.data import DataLoader, Sampler
+from tqdm import tqdm
 
 warnings.filterwarnings("ignore", message="torch.meshgrid: in an upcoming release")
 
@@ -119,7 +120,13 @@ def get_args():
     parser.add_argument("--detr-checkpoint", type=Path, required=True)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--epochs", type=int, default=20)
-    parser.add_argument("--batch-size", type=int, default=1)
+    parser.add_argument("--batch-size", type=int, default=16,
+                        help="Images per optimizer step (the paper uses 16).")
+    parser.add_argument("--num-workers", type=int, default=0,
+                        help="Processes that load and augment images in parallel.")
+    parser.add_argument("--micro-batch", type=int, default=2,
+                        help="Images per forward pass; gradients are accumulated over "
+                             "batch-size / micro-batch passes to fit in GPU memory.")
     parser.add_argument("--lr-head", type=float, default=1e-4)
     parser.add_argument("--weight-decay", type=float, default=1e-4)
     parser.add_argument("--lr-drop", type=int, default=10)
@@ -137,7 +144,7 @@ def get_args():
 def main():
     args = get_args()
     def absolute_from_work_root(path: Path) -> Path:
-        return path.resolve() if path.is_absolute() else (WORK_ROOT.parent / path).resolve()
+        return path.resolve() if path.is_absolute() else (WORK_ROOT / path).resolve()
 
     args.data_root = absolute_from_work_root(args.data_root)
     args.detr_checkpoint = absolute_from_work_root(args.detr_checkpoint)
@@ -159,12 +166,16 @@ def main():
     torch.cuda.manual_seed_all(args.seed)
     torch.cuda.set_device(0)
 
+    print(f"Loading {args.dataset} and the model; the progress bar appears in under a minute.", flush=True)
     train_partition = "train2015" if args.dataset == "hicodet" else "trainval"
     dataset = DataFactory(args.dataset, train_partition, str(args.data_root))
     if args.checkpoint_interval < 1:
         raise ValueError("--checkpoint-interval must be at least 1.")
-    batch_sampler = ResumableRandomBatchSampler(len(dataset), args.batch_size, args.seed)
-    loader = DataLoader(dataset, batch_sampler=batch_sampler, num_workers=0,
+    if args.batch_size % args.micro_batch:
+        raise ValueError("--batch-size must be a multiple of --micro-batch.")
+    accumulate = args.batch_size // args.micro_batch
+    batch_sampler = ResumableRandomBatchSampler(len(dataset), args.micro_batch, args.seed)
+    loader = DataLoader(dataset, batch_sampler=batch_sampler, num_workers=args.num_workers,
                         collate_fn=custom_collate, pin_memory=True,
                         generator=torch.Generator().manual_seed(args.seed))
 
@@ -204,6 +215,9 @@ def main():
         resume_in_progress = checkpoint["epoch_in_progress"] is not None
         resume_offset = int(checkpoint["batch_offset"])
         iteration = int(checkpoint["iteration"])
+        if checkpoint["run"].get("micro_batch") != args.micro_batch or                 checkpoint["run"]["batch_size"] != args.batch_size:
+            raise ValueError(f"{args.resume} was written with a different batch size; "
+                             "move it away to start a new run.")
     else:
         start_epoch = 0
         resume_in_progress = False
@@ -231,9 +245,10 @@ def main():
         "initialization_sha256": sha256(args.detr_checkpoint),
         "initialization_type": "official dataset-specific DETR-R50 checkpoint",
         "model": "UPT-R50",
-        "training_mode": "single GPU; frozen detector; train interaction head",
+        "training_mode": "single GPU; frozen detector; train interaction head; gradient accumulation",
         "epochs_requested": args.epochs,
         "batch_size": args.batch_size,
+        "micro_batch": args.micro_batch,
         "learning_rate_head": args.lr_head,
         "seed": args.seed,
         "gpu": torch.cuda.get_device_name(0),
@@ -245,6 +260,10 @@ def main():
     optimizer.zero_grad(set_to_none=True)
     model.train()
     steps_this_run = 0
+    progress = tqdm(total=args.epochs * (len(dataset) // args.batch_size), initial=iteration,
+                    unit="step", file=sys.stdout, dynamic_ncols=True, smoothing=0.05)
+    positives = passes = raw_loss = 0
+    average_loss = None
     latest_path = args.output_dir / "checkpoint_latest.pt"
 
     def make_checkpoint(epoch_in_progress, next_epoch, batch_offset, permutation):
@@ -275,14 +294,34 @@ def main():
             resume_in_progress = False
             checkpoint = None
             model.train()
+            # Loader workers read ahead of training, so count the images actually
+            # trained on rather than asking the sampler where it is.
+            consumed = batch_sampler.offset
+            epoch_loss = epoch_steps = 0
             for batch in loader:
+                consumed += args.micro_batch
                 images = pocket.ops.relocate_to_cuda(batch[0], non_blocking=True)
                 targets = pocket.ops.relocate_to_cuda(batch[1], non_blocking=True)
                 loss_dict = model(images, targets=targets)
                 loss = sum(loss_dict.values())
                 if not torch.isfinite(loss):
                     raise FloatingPointError(f"Non-finite training loss at iteration {iteration}.")
-                loss.backward()
+                # The paper normalises one step's loss by the positives of all its images.
+                # Back-propagate the un-normalised sum of each pass, then divide the
+                # accumulated gradient by the step's total, which gives the same update.
+                (loss * max(model.num_positives, 1)).backward()
+                positives += model.num_positives
+                raw_loss += loss.item() * max(model.num_positives, 1)
+                passes += 1
+                if passes % accumulate:
+                    continue
+                for parameter in trainable:
+                    if parameter.grad is not None:
+                        parameter.grad /= max(positives, 1)
+                step_loss = raw_loss / max(positives, 1)  # the quantity the step minimises
+                positives = raw_loss = 0
+                epoch_loss += step_loss
+                epoch_steps += 1
                 if args.clip_max_norm > 0:
                     torch.nn.utils.clip_grad_norm_(trainable, args.clip_max_norm)
                 optimizer.step()
@@ -290,14 +329,25 @@ def main():
 
                 iteration += 1
                 steps_this_run += 1
+                progress.update(1)
+                # A single step is noisy; show a running average of the step loss
+                average_loss = (step_loss if average_loss is None
+                                else 0.99 * average_loss + 0.01 * step_loss)
+                progress.set_postfix(epoch=f"{epoch + 1}/{args.epochs}", avg_loss=f"{average_loss:.3f}")
                 if iteration % args.checkpoint_interval == 0:
-                    atomic_save(make_checkpoint(epoch, epoch + 1, batch_sampler.offset,
+                    atomic_save(make_checkpoint(epoch, epoch + 1, consumed,
                                                 batch_sampler.permutation), latest_path)
                 if args.max_steps and steps_this_run >= args.max_steps:
-                    atomic_save(make_checkpoint(epoch, epoch + 1, batch_sampler.offset,
+                    atomic_save(make_checkpoint(epoch, epoch + 1, consumed,
                                                 batch_sampler.permutation), latest_path)
                     return
 
+            # Drop the passes left over at the end of an epoch that do not fill a step
+            optimizer.zero_grad(set_to_none=True)
+            positives = passes = raw_loss = 0
+            # Covers only the steps since a resume if this epoch was resumed part-way
+            progress.write(f"epoch {epoch + 1}/{args.epochs} mean loss "
+                           f"{epoch_loss / max(epoch_steps, 1):.4f} over {epoch_steps} steps")
             scheduler.step()
             atomic_save(make_checkpoint(None, epoch + 1, 0, None), latest_path)
 
