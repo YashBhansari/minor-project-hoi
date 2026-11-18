@@ -32,6 +32,15 @@ How to read these:
 
 Every number comes from a `metrics.json` in `outputs/trained-evaluation/`; the folder names say what was tested (`hico-on-vcoco` is the HICO-DET model on V-COCO, `official-*` are the authors' weights).
 
+## Trained weights
+
+| Model | Download | Size | SHA-256 |
+|---|---|---:|---|
+| HICO-DET | [Google Drive](https://drive.google.com/file/d/1pwI9_FOfNQgv37orY0xMUfrBLVxNSER2/view?usp=sharing) | 310 MB | `2de8eadc92054f220e5423c60b274b118fe05114ae6452edb0539f702f5d63ec` |
+| V-COCO | [Google Drive](https://drive.google.com/file/d/1y8uKdZbmsW6xrrU7W10bWSvgJuGBwQbV/view?usp=sharing) | 309 MB | `61dbd4a0e7c47c629b1ded5f913c6acb7374b4d09eb27a95eedb3bc570acdcda` |
+
+Check a download with `Get-FileHash <file>`. To evaluate one, pass it as `--checkpoint` in the commands under Evaluate (the file name doesn't matter). The files contain the detector weights too.
+
 ## Differences from the paper's setup
 
 - One GPU instead of eight. A step of 16 images is built from 8 forward passes of 2 images, with gradients divided by the total positive pairs, which matches the authors' multi-GPU update.
