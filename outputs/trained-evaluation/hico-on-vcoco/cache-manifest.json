@@ -3,11 +3,11 @@
   "dataset": "V-COCO",
   "partition": "test",
   "num_evaluated_images": 4532,
-  "checkpoint": "C:\\Users\\veera\\Documents\\minor-project-hoi\\checkpoints\\official\\upt-r50-hicodet.pt",
+  "checkpoint": "C:\\Users\\veera\\Documents\\minor-project-hoi\\outputs\\training\\hicodet\\checkpoint_final.pt",
   "trained_on": "hicodet",
-  "checkpoint_sha256": "12f7f84c7c8d5bcc38f53470f57c5cc30ff2f025726e8bcc27addeb0578a258c",
+  "checkpoint_sha256": "2de8eadc92054f220e5423c60b274b118fe05114ae6452edb0539f702f5d63ec",
   "cache": "C:\\Users\\veera\\Documents\\minor-project-hoi\\outputs\\trained-evaluation\\hico-on-vcoco\\cache.pkl",
-  "cache_sha256": "797f8480e50dabcddbc3c9ead936fb4cbfc5dbe644429a2ea5b0bcbce25d73a5",
+  "cache_sha256": "f0f754826e47636d828c1421465eab9cd220b1e9805232a2cb86552d56d1a9ca",
   "cache_bytes": 78820955,
   "environment": {
     "python": "3.14.6",
@@ -16,7 +16,7 @@
     "gpu": "NVIDIA GeForce RTX 5060 Laptop GPU"
   },
   "compatibility_path": "single-process; official UPT cache_vcoco method",
-  "runtime_seconds": 611.0928183000015,
+  "runtime_seconds": 443.8644448999985,
   "peak_cuda_allocated_MiB": 544.26513671875,
   "peak_cuda_reserved_MiB": 1358.0
 }

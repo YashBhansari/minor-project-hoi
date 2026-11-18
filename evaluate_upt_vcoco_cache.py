@@ -29,6 +29,28 @@ def sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
+ROW = re.compile(r"^\s*(\S+): AP = ([0-9.]+) \(#pos = \d+\)", re.M)
+
+
+def ap_rows(block):
+    return {m.group(1): float(m.group(2)) for m in ROW.finditer(block)}
+
+
+def per_class_ap(report):
+    """Per-action and per-role AP (%) from the evaluator's printed report."""
+    agent_end = report.index("Average Agent AP")
+    role_start = report.index("Reporting Role AP")
+    s1_end = report.index("Average Role [scenario_1]")
+    s2_end = report.index("Average Role [scenario_2]")
+    return {
+        "agent_AP_percent": ap_rows(report[:agent_end]),
+        "role_AP_percent": {
+            "scenario_1": ap_rows(report[role_start:s1_end]),
+            "scenario_2": ap_rows(report[s1_end:s2_end]),
+        },
+    }
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--cache", type=Path, default=CACHE_PATH)
@@ -93,6 +115,7 @@ def main():
             key: value * 25.0 / 24.0 for key, value in raw_values.items()
         },
         "correction": "multiply by 25/24 per UPT authors' V-COCO evaluation instructions",
+        **per_class_ap(report),
     }
     metrics_path = output_dir / "metrics.json"
     metrics_path.write_text(json.dumps(metrics, indent=2), encoding="utf-8")
