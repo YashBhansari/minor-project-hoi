@@ -1,6 +1,6 @@
 # Results
 
-UPT-R50 trained on HICO-DET and on V-COCO, evaluated on each dataset's test split. Every number comes from a `metrics.json` file in `outputs/trained-evaluation/` (index in section 6). All evaluations ran on an NVIDIA GeForce RTX 5060 Laptop GPU with Python 3.14.6 and PyTorch 2.14.1+cu130. The test splits contain 9,546 images (HICO-DET `test2015`) and 4,532 images (V-COCO test).
+UPT-R50 trained on HICO-DET and on V-COCO, evaluated on each dataset's test split. Every number comes from a `metrics.json` file in `outputs/trained-evaluation/` (index in section 6). Both models were trained, and every evaluation was run, on an NVIDIA GeForce RTX 5060 Laptop GPU with Python 3.14.6 and PyTorch 2.14.1+cu130. The test splits contain 9,546 images (HICO-DET `test2015`) and 4,532 images (V-COCO test).
 
 **Summary**
 
@@ -47,6 +47,7 @@ Both models start from the dataset-specific DETR-R50 weights, keep the detector 
 | | HICO-DET model | V-COCO model |
 |---|---|---|
 | Initialization | `detr-r50-hicodet.pth` | `detr-r50-vcoco.pth` |
+| Initialization SHA-256 | `71ffa7ddcba327841512624b92a00815bd0d02f7d0aa34943f9b863ce5003ca6` | `3665b62cc268f33d7b8ebd98c2f36662b3a148823a913abdc51227d8cc250350` |
 | Training images | 37,633 | 4,969 |
 | Epochs / optimizer steps | 20 / 47,040 (2,352 per epoch) | 20 / 6,200 (310 per epoch) |
 | Final checkpoint SHA-256 | `2de8eadc92054f220e5423c60b274b118fe05114ae6452edb0539f702f5d63ec` | `61dbd4a0e7c47c629b1ded5f913c6acb7374b4d09eb27a95eedb3bc570acdcda` |
@@ -115,6 +116,7 @@ The reported numbers were cross-checked against the underlying files:
 
 - **HICO-DET aggregates.** For every HICO-DET evaluation, Full, Rare and Non-rare mAP were recomputed from the stored AP of all 600 interactions. The rare split was derived independently from the training annotations (interactions with fewer than 10 training instances: 138 rare, 462 non-rare). All three values matched the stored ones.
 - **Checkpoints.** The SHA-256 of both trained checkpoints, recomputed from the files, equals the hash recorded in the matching `metrics.json` and `cache-manifest.json`.
+- **Training environment.** The GPU, Python and PyTorch versions stored inside both final checkpoints match the environment recorded by the evaluations, and the image counts, step counts, epochs, batch size, learning rate and seed stored there match the settings in section 3.
 - **Datasets.** The six annotation files match the checksums in `data/manifest.md`, and the image counts per partition match its table.
 - **V-COCO scoring.** All four V-COCO prediction caches were scored again with the final scorer. Scenario scores were identical to the stored values, and each corrected score equals the raw score times 25/24.
 - **Distinct runs.** Each V-COCO `metrics.json` records the hash of its own prediction cache, and the caches of different checkpoints have different hashes.
