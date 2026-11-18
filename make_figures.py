@@ -1,10 +1,3 @@
-"""Render the result figures in docs/figures from outputs/trained-evaluation/*/metrics.json.
-
-Requires matplotlib. Run from the project root:  python make_figures.py
-"""
-
-from __future__ import annotations
-
 import json
 from pathlib import Path
 
@@ -19,16 +12,15 @@ from matplotlib.transforms import IdentityTransform
 
 ROOT = Path(__file__).resolve().parent
 EVAL = ROOT / "outputs" / "trained-evaluation"
-OUT = ROOT / "docs" / "figures"
+OUT = ROOT / "figures"
 
-# UPT paper (CVPR 2022), UPT-R50 reference values.
 PAPER_HICO = {"Full": 31.66, "Rare": 25.94, "Non-rare": 33.36}
 PAPER_VCOCO = {"Scenario 1": 59.0, "Scenario 2": 64.5}
 
 SURFACE, INK, INK2, GRID = "#fcfcfb", "#0b0b0b", "#52514e", "#e4e3df"
 PAPER, RELEASED, OURS, OURS_CROSS = "#9a9994", "#eb6834", "#2a78d6", "#86b6ef"
 DPI = 200
-PX = DPI / 96  # device pixels per CSS pixel
+PX = DPI / 96
 
 
 def metrics(name):
@@ -52,7 +44,6 @@ def style(ax):
 
 
 def round_bar(ax, x, height, width, color):
-    """Bar with a 4px rounded data end and a square baseline, drawn in pixel space."""
     (x0, y0), (x1, y1) = ax.transData.transform([(x - width / 2, 0), (x + width / 2, height)])
     r = min(4 * PX, (x1 - x0) / 2, y1 - y0)
     verts = [(x0, y0), (x0, y1 - r), (x0, y1), (x0 + r, y1), (x1 - r, y1),
@@ -64,7 +55,6 @@ def round_bar(ax, x, height, width, color):
 
 
 def grouped_bars(ax, groups, series, ymax, fmt, bar_in=0.22, gap_in=0.22):
-    """series: list of (label, color, [value per group]). fmt(value, series index) -> label."""
     fig = ax.figure
     ax.set_xlim(-0.6, len(groups) - 0.4)
     ax.set_ylim(0, ymax)
@@ -129,7 +119,7 @@ def vcoco_headline():
     fig, ax = new_figure(7.2, 4.0)
     fig.subplots_adjust(top=0.72, bottom=0.1, left=0.07, right=0.98)
     grouped_bars(ax, [k for k, _ in keys], series, 80,
-                 lambda v, s: f"{v:.1f}" if s == 0 else f"{v:.2f}")  # the paper reports one decimal
+                 lambda v, s: f"{v:.1f}" if s == 0 else f"{v:.2f}")
     ax.set_yticks(range(0, 81, 20))
     legend(ax, [(l, c) for l, c, _ in series], 3)
     title(ax, "V-COCO: AP_role (%) on the test split", "UPT-R50, 4,532 test images, corrected by 25/24")
@@ -200,8 +190,7 @@ def cross_dataset():
 def vcoco_per_role():
     ours = metrics("vcoco-on-vcoco")["role_AP_percent"]["scenario_1"]
     cross = metrics("hico-on-vcoco")["role_AP_percent"]["scenario_1"]
-    roles = sorted(ours, key=lambda k: ours[k] - cross[k])  # biggest drop at the top after reversing
-    roles = roles[::-1]
+    roles = sorted(ours, key=lambda k: ours[k] - cross[k], reverse=True)
     fig, ax = new_figure(7.2, 0.27 * len(roles) + 1.5)
     ax.yaxis.grid(False)
     ax.xaxis.grid(True, color=GRID, linewidth=0.8)

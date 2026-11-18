@@ -1,0 +1,9 @@
+--extra-index-url https://download.pytorch.org/whl/cu130
+torch==2.14.1+cu130
+torchvision==0.29.1+cu130
+numpy==2.5.4
+scipy==1.18.1
+matplotlib==3.11.2
+pycocotools==2.0.11
+tqdm==4.70.1
+-e git+https://github.com/fredzzhang/pocket.git@bff287098bb73427fd8d5525b2ac9867fb56629d#egg=pocket

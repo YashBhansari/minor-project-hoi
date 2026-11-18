@@ -1,69 +1,107 @@
-# UPT-R50 for human-object interaction detection
+# UPT-R50 on HICO-DET and V-COCO
 
-This project trains **UPT-R50**, the Unary-Pairwise Transformer with a ResNet-50 detector ([Zhang et al., CVPR 2022](https://arxiv.org/abs/2112.01838)), on **HICO-DET** and **V-COCO** in two independent runs on a single Windows GPU, and evaluates each trained model on both datasets.
+Reproduction of [UPT](https://arxiv.org/abs/2112.01838) (Unary-Pairwise Transformer, CVPR 2022) for human-object interaction detection. Two models trained on a single Windows laptop GPU (RTX 5060, 8 GB): one on HICO-DET, one on V-COCO. Each is tested on both datasets.
 
 ## Results
 
-Both trained models reproduce the published UPT-R50 numbers to within 0.5 points.
+Same-dataset results match the paper.
 
-**HICO-DET**, Default mAP (%) on `test2015`:
+| | HICO-DET mAP (full / rare / non-rare) | V-COCO AP_role (S1 / S2) |
+|---|---|---|
+| Paper | 31.66 / 25.94 / 33.36 | 59.0 / 64.5 |
+| Authors' released weights, rescored here | 31.72 / 26.09 / 33.41 | 58.94 / 64.46 |
+| **Ours** | **31.66 / 26.44 / 33.22** | **59.03 / 64.60** |
 
-| | Full | Rare | Non-rare |
-|---|---:|---:|---:|
-| UPT paper | 31.66 | 25.94 | 33.36 |
-| Authors' released checkpoint | 31.72 | 26.09 | 33.41 |
-| **Ours** | **31.66** | **26.44** | **33.22** |
+Cross-dataset (not in the paper):
 
-**V-COCO**, AP_role (%) on the test split, corrected by 25/24:
-
-| | Scenario 1 | Scenario 2 |
+| Trained on | Tested on HICO-DET (full mAP) | Tested on V-COCO (S1 / S2) |
 |---|---:|---:|
-| UPT paper | 59.0 | 64.5 |
-| Authors' released checkpoint | 58.94 | 64.46 |
-| **Ours** | **59.03** | **64.60** |
+| HICO-DET | 31.66 | 44.35 / 48.30 |
+| V-COCO | 7.03 | 59.03 / 64.60 |
 
-![HICO-DET results](docs/figures/hicodet_results.png)
-![V-COCO results](docs/figures/vcoco_results.png)
+![HICO-DET](figures/hicodet_results.png)
+![V-COCO](figures/vcoco_results.png)
+![Cross-dataset](figures/cross_dataset.png)
 
-**Cross-dataset**: each model scored on the other dataset by translating its predicted classes.
+How to read these:
 
-| Model | HICO-DET Full mAP | V-COCO AP_role S1 / S2 |
-|---|---:|---:|
-| Trained on HICO-DET | **31.66** | 44.35 / 48.30 |
-| Trained on V-COCO | 7.03 | **59.03 / 64.60** |
+- **V-COCO scores are multiplied by 25/24.** The scorer averages 25 roles including `point instr`, which is always 0; the UPT authors exclude it this way ([discussion](https://github.com/fredzzhang/upt/discussions/14)). `metrics.json` has both raw and corrected values.
+- **Cross-dataset means translating class names.** HICO-DET has 117 verbs and V-COCO has 24 actions. A prediction is kept if the other dataset has the same verb or one of the 14 pairs hand-picked in `cross_dataset.py` (the loosest: `look`/`watch`, `hit`/`swing`). Everything else is dropped.
+- **Why V-COCO to HICO-DET is only 7.03.** Only 147 of the 600 HICO-DET interactions have a V-COCO counterpart; the other 453 score zero. Over those 147 the mAP is 28.71.
+- **HICO-DET to V-COCO** covers 23 of 24 actions (`eat instr` has no match).
 
-![Cross-dataset results](docs/figures/cross_dataset.png)
+Every number comes from a `metrics.json` in `outputs/trained-evaluation/`; the folder names say what was tested (`hico-on-vcoco` is the HICO-DET model on V-COCO, `official-*` are the authors' weights).
 
-On V-COCO, the HICO-DET model scores about 75% of what the V-COCO-trained model does. The V-COCO model reaches 7.03 mAP on HICO-DET because only 147 of HICO-DET's 600 interaction classes have a V-COCO counterpart; over those 147 classes its mAP is 28.71. [results.md](results.md) has the full tables, per-class analysis and verification.
+## Differences from the paper's setup
+
+- One GPU instead of eight. A step of 16 images is built from 8 forward passes of 2 images, with gradients divided by the total positive pairs, which matches the authors' multi-GPU update.
+- Everything else follows their recipe: frozen DETR detector, interaction head only, 20 epochs, AdamW lr 1e-4, weight decay 1e-4, lr ÷10 at epoch 10, clip 0.1, seed 66.
+- Training took 16 h 15 min for HICO-DET (47,040 steps) and about 4 h for V-COCO (6,200 steps).
 
 ## Setup
 
-| Item | Value |
+Python 3.14 on Windows with an NVIDIA GPU.
+
+```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+pip install -r requirements.txt
+```
+
+Clone the two upstream repos at the pinned commits and apply the patches:
+
+```powershell
+git clone --recurse-submodules https://github.com/fredzzhang/upt.git .\repos\upt
+git -C .\repos\upt checkout 192743045e4c5f6827299fdc15809f5b97ac1b8e
+git -C .\repos\upt submodule update --init --recursive
+git -C .\repos\upt apply ..\..\patches\upt-single-gpu-loss.patch
+
+git clone https://github.com/s-gupta/v-coco.git .\repos\v-coco
+git -C .\repos\v-coco checkout 489cc4db74f2f10ab4b134f67da3874afbf245ab
+git -C .\repos\v-coco apply ..\..\patches\vcoco-evaluator-python3.patch
+```
+
+The patches are the edits this project needs in those repos: `upt-single-gpu-loss.patch` keeps the loss finite when a batch has no positive pairs and exposes the positive count; `vcoco-evaluator-python3.patch` ports the Python 2 V-COCO scorer to Python 3 and NumPy 2. Apply each once.
+
+Data and weights (not in git):
+
+- `data/hico_20160224_det/images/{train2015,test2015}`: [HICO-DET](https://umich-ywchao-hico.github.io/)
+- `data/mscoco2014/{train2014,val2014,annotations}`: [COCO 2014](https://cocodataset.org/#download)
+- `data/instances_*.json`: copy the six files from `repos/upt/hicodet/` and `repos/upt/vcoco/`
+- `checkpoints/`: the DETR-R50 weights `detr-r50-hicodet.pth` and `detr-r50-vcoco.pth`, and optionally the released `upt-r50-hicodet.pt` and `upt-r50-vcoco.pt`, from the [UPT model zoo](https://github.com/fredzzhang/upt)
+
+## Train
+
+```powershell
+.\train.ps1 hicodet
+.\train.ps1 vcoco
+```
+
+Run one at a time (8 GB is enough for one). Checkpoints are saved every 250 steps and re-running the same command resumes. The final model is `outputs\training\<dataset>\checkpoint_final.pt`.
+
+## Evaluate
+
+```powershell
+python .\evaluate_upt_hicodet_windows.py --checkpoint .\outputs\training\hicodet\checkpoint_final.pt --output-dir .\outputs\trained-evaluation\hico-on-hico
+python .\evaluate_upt_hicodet_windows.py --checkpoint .\outputs\training\vcoco\checkpoint_final.pt --trained-on vcoco --output-dir .\outputs\trained-evaluation\vcoco-on-hico
+
+python .\cache_upt_vcoco_windows.py --checkpoint .\outputs\training\vcoco\checkpoint_final.pt --output-dir .\outputs\trained-evaluation\vcoco-on-vcoco
+python .\evaluate_upt_vcoco_cache.py --cache .\outputs\trained-evaluation\vcoco-on-vcoco\cache.pkl --output-dir .\outputs\trained-evaluation\vcoco-on-vcoco
+
+python .\cache_upt_vcoco_windows.py --checkpoint .\outputs\training\hicodet\checkpoint_final.pt --trained-on hicodet --output-dir .\outputs\trained-evaluation\hico-on-vcoco
+python .\evaluate_upt_vcoco_cache.py --cache .\outputs\trained-evaluation\hico-on-vcoco\cache.pkl --output-dir .\outputs\trained-evaluation\hico-on-vcoco
+```
+
+HICO-DET evaluation takes about 16 minutes, V-COCO about 20. Leave out `--checkpoint` and `--output-dir` to score the authors' released weights instead. `python .\make_figures.py` redraws `figures/` from the metrics files.
+
+## Code
+
+| File | Purpose |
 |---|---|
-| Model | UPT-R50; DETR detector frozen, interaction head trained |
-| Training | 20 epochs, batch 16 (8 passes of 2 images), AdamW lr 1e-4, weight decay 1e-4, lr ÷10 at epoch 10, gradient clip 0.1, seed 66 |
-| HICO-DET run | 47,040 steps, 16 h 15 min, 37,633 training images |
-| V-COCO run | 6,200 steps, 4,969 training images |
-| Machine | Windows 11, NVIDIA GeForce RTX 5060 Laptop GPU (8 GB), 16 GB RAM |
-| Software | Python 3.14.6, PyTorch 2.14.1+cu130, torchvision 0.29.1+cu130 |
-
-Training and evaluation are single-process Windows adaptations of the upstream UPT code; see [PATCHES.md](PATCHES.md) for the changes.
-
-## Documentation
-
-| File | Contents |
-|---|---|
-| [results.md](results.md) | All results, figures, training runs, verification |
-| [REPRODUCE.md](REPRODUCE.md) | Setup, training, evaluation and figure commands |
-| [experiment-plan.md](experiment-plan.md) | Experiment protocol and configuration |
-| [PATCHES.md](PATCHES.md) | Changes to the upstream UPT and V-COCO evaluator code |
-| [data/manifest.md](data/manifest.md) | Dataset sizes and annotation checksums |
-
-Datasets, model weights, training checkpoints, prediction caches and the upstream clones are not stored in this repository; [REPRODUCE.md](REPRODUCE.md) explains how to restore them.
-
-## Upstream references
-
-- UPT paper and code: <https://github.com/fredzzhang/upt>
-- HICO-DET dataset: <https://umich-ywchao-hico.github.io/>
-- V-COCO annotations and evaluator: <https://github.com/s-gupta/v-coco>
-- COCO 2014 images and annotations: <https://cocodataset.org/#download>
+| `train.ps1`, `train_upt_windows.py` | Launcher and single-GPU trainer |
+| `evaluate_upt_hicodet_windows.py` | HICO-DET evaluation |
+| `cache_upt_vcoco_windows.py`, `evaluate_upt_vcoco_cache.py` | V-COCO predictions, then scoring |
+| `cross_dataset.py` | Class translation for cross-dataset tests |
+| `common.py` | Code shared by the above |
+| `make_figures.py` | Draws the figures |
+| `patches/` | The two upstream patches |
