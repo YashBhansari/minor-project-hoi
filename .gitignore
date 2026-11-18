@@ -19,7 +19,7 @@
 *.zip
 
 # Upstream source clones are separate Git repositories. Recreate them from
-# the pinned commits/instructions in HANDOFF.md and apply the project patches.
+# the pinned commits/instructions in REPRODUCE.md and apply the project patches.
 /repos/
 
 # Python-generated files and local run logs

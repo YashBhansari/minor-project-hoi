@@ -11,8 +11,6 @@ Dataset images and annotations are local inputs and are not redistributed with t
 | COCO 2014 train2014 | 82,783 |
 | COCO 2014 val2014 | 40,504 |
 
-Robocopy reported 47,781 HICO-DET files and 123,293 COCO files already present (skipped), zero failures. The prior WSL-side copy had completed the data before Robocopy ran.
-
 ## UPT loader preflight
 
 Every UPT annotation-referenced image in the following partitions exists and the first sample decoded successfully:

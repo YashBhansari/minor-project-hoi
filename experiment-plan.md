@@ -6,7 +6,7 @@ Run one UPT-R50 architecture in two independent dataset-specific experiments. St
 
 ## Hardware and runtime
 
-Original machine: Windows 11, RTX 2050 with 4 GB VRAM, 16 GB RAM. Local software check: Python 3.14.7, PyTorch 2.14.1+cu130, torchvision 0.29.1+cu130. The checked-in environment freeze records the installed packages. The launcher path to Python is machine-specific and must be updated if running elsewhere.
+Machine: Windows 11, NVIDIA GeForce RTX 5060 Laptop GPU (8 GB), 16 GB RAM. Software: Python 3.14.6, PyTorch 2.14.1+cu130, torchvision 0.29.1+cu130. The checked-in environment freeze records the installed packages. The launchers use `UPT_PYTHON` if set, otherwise the `python` on `PATH`.
 
 ## Training configuration in the launchers
 
@@ -27,13 +27,15 @@ Original machine: Windows 11, RTX 2050 with 4 GB VRAM, 16 GB RAM. Local software
 | Checkpoint interval | Every 250 optimizer steps and each epoch boundary |
 | Distributed training | Disabled; one process on Windows |
 
-GPU memory is the reason for accumulating small forward passes in a single process. The trainer shows a live progress bar and does not create training logs. Check the checkpoint file's last-modified time and process CPU time to monitor activity. Do not claim a duration in advance; record actual runtime.
+GPU memory is the reason for accumulating small forward passes in a single process. The trainer shows a live progress bar and does not create training logs. Measured runtimes: HICO-DET took 47,040 optimizer steps in 16 h 15 min (about 1.24 s per step); V-COCO took 6,200 steps.
 
 ## Evaluation protocol
 
 - HICO-DET: run `evaluate_upt_hicodet_windows.py` on `test2015`; report Default Full/Rare/Non-Rare mAP.
 - V-COCO: generate the UPT prediction cache with `cache_upt_vcoco_windows.py`; score using the patched Gupta evaluator via `evaluate_upt_vcoco_cache.py`; report AP_role for Scenarios 1 and 2 and state the UPT 25/24 correction.
-- Commands and output paths are in [HANDOFF.md](HANDOFF.md).
+- Cross-dataset: evaluate each trained model on the other dataset with `--trained-on`, which translates its predicted classes.
+- Authors' released checkpoints are evaluated the same way as reference rows.
+- Commands and output paths are in [REPRODUCE.md](REPRODUCE.md).
 
 ## Dataset loader sizes
 
@@ -53,7 +55,7 @@ The UPT data loaders filter to images with annotated interactions; counts below 
 | HICO-DET Default Full / Rare / Non-Rare mAP | 31.66 / 25.94 / 33.36 |
 | V-COCO AP_role Scenario 1 / Scenario 2 | 59.0 / 64.5 |
 
-These are comparison references, not expected or guaranteed local training outcomes. The separately measured released-checkpoint results are documented in [results.md](results.md).
+The measured results, with the authors' released checkpoints as additional reference rows, are in [results.md](results.md).
 
 ## Reproduction deviations and code changes
 
@@ -65,6 +67,6 @@ These are comparison references, not expected or guaranteed local training outco
 
 Details and diffs: [PATCHES.md](PATCHES.md), `vcoco-evaluator-python3.patch`.
 
-## Result integrity
+## Result provenance
 
-Keep three things separate: paper reference numbers, evaluation numbers from official released UPT checkpoints, and measurements from the local fine-tuned checkpoints. Only the last category answers how the local training runs performed. Record each locally trained result from its evaluation JSON; do not fill a gap by copying a paper or baseline value.
+Three kinds of numbers appear in [results.md](results.md): the paper's reference values, evaluations of the authors' released checkpoints, and evaluations of the checkpoints trained here. Every reported figure of the last two kinds comes from a `metrics.json` file in `outputs/trained-evaluation/` that records the checkpoint's SHA-256, the test split and the environment.
